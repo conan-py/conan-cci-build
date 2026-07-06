@@ -5,3 +5,4 @@ Populate a Conan 2 Artifactory remote from a local Conan Center Index checkout.
 # Links
 
 - https://github.com/conan-io/conan-center-index
+- https://github.com/conan-io/conan-extensions

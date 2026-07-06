@@ -1,0 +1,11 @@
+README.md
+setup.py
+requirements.txt
+LICENSE
+.gitignore
+
+test/**
+src/**
+.github/**
+.venv/**
+.idea/**

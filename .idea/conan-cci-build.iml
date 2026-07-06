@@ -6,7 +6,7 @@
       <sourceFolder url="file://$MODULE_DIR$/test/micro" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.14 (conan-cci-build)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.13 (conan-cci-build)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

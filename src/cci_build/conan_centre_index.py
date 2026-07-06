@@ -69,6 +69,7 @@ def find_cci_conanfile(cci_root: Path, package_name: str, version: Optional[str]
 
                 conandata_path = make_cci_recipie_package_conandata_filename(conanfile_folder_name, recipe_dir)
                 if conandata_path.exists():
+
                     conandata = read_conandata_yaml(conandata_path)
                     if conandata:
                         return v, conanfile_path
