@@ -1,3 +1,6 @@
+"""
+    Trivial setup.py to package for publishing the module to pypi.
+"""
 from setuptools import setup, find_packages
 
 setup(
