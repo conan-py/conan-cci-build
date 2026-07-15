@@ -1,11 +1,26 @@
-conan
+# Decentralized, open-source (MIT), C/C++ package manager.
+#
+# see:
+#   - https://pypi.org/project/conan/
+conan >= 2.30.0
 
 #
 #  see:
 #  - https://pypi.org/project/packaging/
 packaging >= 26.2
 
-
 #  Only used for developement
 #
 pytest >= 9.1.1
+
+# Pylint is a static code analyser for Python 2 or 3
+#
+# see:
+#   - https://pypi.org/project/pylint/
+pylint >= 4.0.6
+
+# pip is the package installer for Python.
+#
+# see:
+#  - https://pypi.org/project/pip/
+pip >= 26.1.2
