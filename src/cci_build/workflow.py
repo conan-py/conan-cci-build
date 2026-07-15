@@ -2,7 +2,9 @@ import logging
 from pathlib import Path
 from typing import Tuple, List, Optional, Any
 
-from conan.internal.graph.graph import Node, RECIPE_VIRTUAL, RECIPE_CONSUMER
+from conan.internal.errors import NotFoundException
+from conan.internal.graph.graph import Node, RECIPE_VIRTUAL, RECIPE_CONSUMER, DepsGraph
+from conan.internal.graph.install_graph import InstallGraph
 
 from cci_build.conan_centre_index import find_cci_conanfile
 from cci_build.conan_client import ConanClient
@@ -14,10 +16,19 @@ from conan.api.output import ConanOutput
 from cci_build.profile_matcher import include_rules
 
 from conan.api.conan_api import ConanAPI
-from conan.api.model import RecipeReference
+from conan.api.model import RecipeReference, Remote, ListPattern
 from conan.internal.model.profile import Profile
 
+def make_revision(ref: RecipeReference) -> str:
+    pattern_str = f"{ref.name}/{ref.version if ref.version else '*'}"
+    return pattern_str + (f"@{ref.user}/{ref.channel}" if ref.user and ref.channel else "#*")
 
+def list_select(conan :ConanClient, search_pattern :ListPattern, remote: Optional[Remote]) -> bool:
+    try:
+        return  conan.api.list.select(search_pattern, remote=remote)
+
+    except NotFoundException as e:
+       return False
 
 class Workflow:
     def __init__(self):
@@ -70,31 +81,19 @@ class Workflow:
         #  see:
         #    - https://docs.conan.io/2/reference/commands/graph/info.html
         #    - https://docs.conan.io/2/reference/extensions/python_api/GraphAPI.html
-        graph = self.build_package_graph(refs, ctx)
 
-        xx = self.make_build_graph(graph, ctx)
+        remote = self.api.remotes.get(ctx.remote) if ctx.remote else None
+        remotes = [remote] if remote else []
 
-        ordered_build_graph = graph.subgraph(xx).topological_sort()
+        self.create_remote_recipe(refs, ctx, remote)
 
+        graphs = self.build_package_graph(refs, ctx, remotes)
 
-        """
-        deps_graph = self.api.graph.load_graph_requires(
-            requires=[f"{r.name}/{r.version}" for r in refs],
-            tool_requires=[],
-            profile_host=self.profile_host,
-            profile_build=self.profile_build,
-            lockfile=None,
-            remotes=[self.api.remotes.get(ctx.remote)],
-            update=False
-        )
+        xx = self.make_build_graph(graphs, ctx, remotes)
 
-        x = self.api.graph.analyze_binaries(deps_graph, build_mode=["missing"],             remotes=[self.api.remotes.get(ctx.remote)])
+        ordered_build_graph = self.api.graph.subgraph(xx).topological_sort()
 
-        # root_conanfile = self.api.graph.load_root_virtual(
-        #     requires=refs,
-        #     profile_host=self.profile_host,
-        #     profile_build=self.profile_build
-        # )
+        """      
 
         # 3. Resolve the full dependency graph and identify missing binaries
         # --build=missing is specified to determine what actually needs compiling
@@ -126,55 +125,95 @@ class Workflow:
                 self.log.info("Skipping package '%s' as it does not match the host profile", pkg.name)
         return refs
 
-    def build_package_graph(self, packages : List[Tuple[RecipeReference, Path]], context:Context):
+    def build_package_graph(
+            self, packages: List[Tuple[RecipeReference, Path]], context: Context, remotes: List[Remote]) -> List[DepsGraph]:
         """
             For each of the packages, add it to the package graph.
         """
 
         graphs = []
         for ref, conanfile in packages:
+            self.log.info(f"Building graph '{str(ref)}'")
             clean_conanfile_path = str(Path(conanfile).resolve().absolute())
             deps_graph = self.conan.api.graph.load_graph_consumer(
-                # path=str(conanfile),
                 path=clean_conanfile_path,
                 name=ref.name,
-                version = ref.version,
+                version=ref.version,
                 user=ref.user,
                 channel=ref.channel,
-                remotes=[self.api.remotes.get(context.remote)],
+                remotes=remotes,
                 lockfile=None,
-                update=False,
+                update=True,  # update the remote if the recipie doesn't exist
                 profile_host=self.profile_host,
                 profile_build=self.profile_build)
 
+            # Stop now if there was an error
+            deps_graph.report_graph_error()
+
             graphs.append(deps_graph)
 
-        # Merge all graphs into one
-        return self.conan.api.graph.merge_graphs(graphs)
+        return graphs
 
-    def make_build_graph(self, graph, context:Context):
+    def make_one(self, graph: DepsGraph, context: Context, remotes: List[Remote]) -> InstallGraph:
+
+        class DummyProfileArgs:
+            def __getattr__(self, name):
+                return None
+
+        self.log.info(f"Graph {graph.nodes[0].name}")
+
+        # Go to the remote and check if the binaries are present. It is important
+        # to note that the recipe must exist at the remote.
+        self.conan.api.graph.analyze_binaries(graph, build_mode=["missing"], remotes=remotes)
+
+        # Create an install graph from the dependency graph.
+        return self.conan.api.graph.build_order(graph, profile_args=DummyProfileArgs())
+
+
+    def create_remote_recipe(self, refs: List[Tuple[RecipeReference, Path]], context: Context, remote: Remote):
+        for ref, conanfile_path in refs:
+            search_pattern = ListPattern(make_revision(ref))
+            self.log.info(f'Searching for recipe "{ make_revision(ref) }"')
+            remote_check = list_select(self.conan, search_pattern, remote=remote)
+            if not remote_check:
+
+                local_recipes = list_select(self.conan, search_pattern, remote=None)
+                if not local_recipes:
+                    self.log.info(f'Exporting recipe "{ str(ref) }"')
+                    clean_conanfile_path = str(Path(conanfile_path).resolve().absolute())
+
+                    exported_ref, conanfile_obj = self.conan.api.export.export(
+                        path=clean_conanfile_path,
+                        name=ref.name,
+                        version=ref.version,
+                        user=ref.user,
+                        channel=ref.channel)
+
+                self.log.info(f'Upload recipe "{ str(ref) }"')
+                self.conan.api.upload.upload_full(
+                    package_list=local_recipes,
+                    remote=remote,
+                    enabled_remotes=[remote],
+                    dry_run=False)
+            else:
+                self.log.info(f'Recipe "{str(ref)}" present at remote "{remote.name}"')
+
+    def make_build_graph(self, graphs: List[DepsGraph], context: Context, remotes: List[Remote]):
         """
             Create an order graph of the packages to be built.
         """
 
-        build_list = []
-        for node in graph.nodes:
-            if node.recipe == RECIPE_VIRTUAL:
-                continue
+        install_graphs = [self.make_one(g, context, remotes)for g in graphs]
 
-            if node.recipe == RECIPE_CONSUMER:
-                continue
+        if len(install_graphs) > 0:
+            merged_build_order = install_graphs[0]
+            for ig in install_graphs[1:]:
+                merged_build_order.merge(ig)
+        else:
+            merged_build_order = []
 
-            self.conan.api.graph.analyze_binaries(
-                graph=node.graph,
-                remotes=[artifactory_remote]
-            )
-
-            if node.binary == "Build":
-                build_list.append(node)
 
     def get_matrix_build_order(self, package_list, profile_host_path, profile_build_path=None):
-
         # 1. Load profiles for the specific matrix node
 
         # 4. Analyze binaries against remotes/cache to mark build status
@@ -182,146 +221,8 @@ class Workflow:
 
         # 5. Extract the ordered matrix build steps
         # This groups packages into sequential lists ("levels") that can be safely built in parallel
-        build_order = api.graph.get_build_order(deps_graph)
+        build_order = self.api.graph.get_build_order(deps_graph)
         return build_order
 
-    # # Example Usage
-    # if __name__ == "__main__":
-    #     targets = ["zlib/1.3.1", "openssl/3.2.1", "libcurl/8.6.0"]
-    #
-    #     # Levels represent chronological steps; packages within the same level have no mutual dependencies
-    #     levels = get_matrix_build_order(targets, profile_host_path="default")
-    #
-    #     for idx, level in enumerate(levels):
-    #         print(f"--- Build Level {idx} (Can execute concurrently) ---")
-    #         for item in level:
-    #             # item.ref contains the package recipe reference requiring compilation
-    #             print(f"  Compile: {item.ref} (ID: {item.package_id})")
-    #
-    # def _run_one(self, conanfile: str, version: str, options: List[Tuple[str, str]]  ctx: Context
-    #
-    # ) -> None:
-    # # if not self.matcher.include(pkg, ctx.host_profile):
-    # #     return
-    # #
-    # # recipe = self.cci.resolve(ctx.cci_root, pkg)
-    #
-    # if self.conan.binary_exists(pkg.ref, ctx.remote):
-    #     return
-    #
-    # built = self.conan.create(recipe, ctx.host_profile, ctx.build_profile)
-    # self.conan.upload(built, ctx.remote)
-
-"""
-from conan.api.conan_api import ConanAPI
-from conans.client.graph.graph import Node
 
 
-HOST_PROFILE = "profiles/linux-gcc13"
-BUILD_PROFILE = "profiles/build"
-
-CCI_PATH = Path("/work/conan-center-index")
-REMOTE = "artifactory"
-
-ROOT_PACKAGES = [
-    "zlib/1.3.1",
-    "fmt/11.0.2",
-    "openssl/3.5.0",
-]
-
-
-conan = ConanAPI()
-
-
-# ----------------------------------------------------------------------
-# Configure remotes / profiles
-# ----------------------------------------------------------------------
-
-host_profile = conan.profiles.get_profile([HOST_PROFILE])
-build_profile = conan.profiles.get_profile([BUILD_PROFILE])
-
-remotes = conan.remotes.list()
-artifactory_remote = next(r for r in remotes if r.name == REMOTE)
-
-
-# ----------------------------------------------------------------------
-# Build a graph from recipes in the local CCI checkout
-# ----------------------------------------------------------------------
-
-graphs = []
-
-for ref in ROOT_PACKAGES:
-
-    deps_graph = conan.graph.load_graph_consumer(
-        path=CCI_PATH / "recipes",
-        name=ref,
-        profile_host=host_profile,
-        profile_build=build_profile,
-    )
-
-    graphs.append(deps_graph)
-
-
-# Merge all graphs into one
-full_graph = conan.graph.merge_graphs(graphs)
-
-
-# ----------------------------------------------------------------------
-# Determine which packages already have binaries
-# ----------------------------------------------------------------------
-
-packages_to_build = []
-
-for node in full_graph.nodes:
-
-    if node.recipe == Node.RECIPE_VIRTUAL:
-        continue
-
-    if node.recipe == Node.RECIPE_CONSUMER:
-        continue
-
-    conan.graph.analyze_binaries(
-        graph=node.graph,
-        remotes=[artifactory_remote]
-    )
-
-    if node.binary == "Build":
-        packages_to_build.append(node)
-
-
-# ----------------------------------------------------------------------
-# Build dependency graph of packages needing binaries
-# ----------------------------------------------------------------------
-
-build_graph = full_graph.subgraph(packages_to_build)
-
-ordered_nodes = build_graph.topological_sort()
-
-
-# ----------------------------------------------------------------------
-# Build in dependency order
-# ----------------------------------------------------------------------
-
-for node in ordered_nodes:
-
-    print(f"Building {node.ref}")
-
-    conan.create.create(
-        path=node.recipe_folder,
-        profile_host=host_profile,
-        profile_build=build_profile,
-    )
-
-
-# ----------------------------------------------------------------------
-# Upload
-# ----------------------------------------------------------------------
-
-for node in ordered_nodes:
-
-    print(f"Uploading {node.ref}")
-
-    conan.upload.upload(reference=node.ref, remote=REMOTE, packages="*", confirm=True)
-
-
-"""

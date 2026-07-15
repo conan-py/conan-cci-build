@@ -84,7 +84,7 @@ def find_config_version(
         versions: dict[str, VersionInfo],
         version: Optional[str]) -> Tuple[Optional[str], Optional[VersionInfo]]:
     """
-        Given a `Config.yml` set of versions available, select the version information
+        Given a `config.yml` set of versions available, select the version information
         for that version. If no version is specified, then select the latest/newest version.
 
         Use standard PEP 440 version parsing rules to compare version numbers.

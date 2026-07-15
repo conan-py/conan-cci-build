@@ -39,8 +39,8 @@ def main():
     target_dir = conan_home / "extensions" / "commands"
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    src = Path(__file__).parent / "cci_build.py"
-    dst = target_dir / "cci_build.py"
+    src = Path(__file__).parent / "cmd_cci_build.py"
+    dst = target_dir / "cmd_cci_build.py"
 
     shutil.copyfile(src, dst)
 

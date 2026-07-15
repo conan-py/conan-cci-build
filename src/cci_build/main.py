@@ -28,7 +28,7 @@ def cci_build_command(conan_api: ConanAPI, parser, *args):
         host_profile=parsed_args.host_profile,
         build_profile=parsed_args.build_profile,
         packages_filename=parsed_args.file,
-        channel="test",
+        channel=None,
         user=None
     )
 
