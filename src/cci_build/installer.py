@@ -1,3 +1,6 @@
+"""
+    A script to install the cci-build command into Conan.
+"""
 import logging
 import os
 import shutil

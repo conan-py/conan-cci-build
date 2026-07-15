@@ -1,3 +1,6 @@
+"""
+    Entrypoint for the cci-build (called from the conan extension command)
+"""
 import argparse
 from pathlib import Path
 
@@ -7,9 +10,10 @@ from conan.cli.command import conan_command
 
 from cci_build.model.context import Context
 
-def cci_build_command(conan_api: ConanAPI, parser, *args):
+
+def cci_build_command(_conan_api: ConanAPI, parser, *args):
     """
-    Build Conan Center Index packages using a custom utility pipeline.
+        Build Conan Center Index packages using a custom utility pipeline.
     """
     # Conan provides its own pre-configured argparse instance via 'parser'
     parser.add_argument("--cci-root", required=True, help="Path to the CCI root directory.")

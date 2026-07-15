@@ -1,8 +1,11 @@
+"""
+
+"""
 from pathlib import Path
 from typing import Iterable
 
 from conan.api.conan_api import ConanAPI
-from conan.api.output import ConanOutput
+from conan.api.model import Remote, ListPattern
 
 from cci_build.error.exception import ConanAdapterError
 
@@ -18,20 +21,20 @@ class ConanClient:
         except Exception as e:
             raise ConanAdapterError(str(e))
 
-    def binary_exists(self, ref: str, remote: str) -> bool:
+    def binary_exists(self, ref: ListPattern, remote: Remote) -> bool:
         """
-        Uses Conan list against remote.
+            Uses Conan list against remote.
         """
 
         try:
             result = self.api.list.select(ref, remote=remote)
-            return bool(result) and len(result) > 0
+            return bool(result)
         except Exception:
             return False
 
     def create(self, recipe: Path, host: str, build: str) -> list[str]:
         """
-        Executes in-process create using Conan API.
+            Executes in-process create using Conan API.
         """
 
         try:

@@ -1,3 +1,6 @@
+"""
+    A conan extension command entry point that thunks through to the cc-build module.
+"""
 import argparse
 
 from conan.api.conan_api import ConanAPI
@@ -14,4 +17,3 @@ def cci_build(conan_api: ConanAPI, parser: argparse.ArgumentParser, *args):
     """
     from cci_build.main import cci_build_command
     return cci_build_command(conan_api, parser, *args)
-

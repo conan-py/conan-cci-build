@@ -1,5 +1,5 @@
 from fnmatch import fnmatch
-from typing import Optional, List
+from typing import List
 
 from cci_build.model.settings.types import ProfileRule, PackageEntry
 
