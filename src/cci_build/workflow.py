@@ -82,17 +82,21 @@ class Workflow:
         #    - https://docs.conan.io/2/reference/commands/graph/info.html
         #    - https://docs.conan.io/2/reference/extensions/python_api/GraphAPI.html
 
-        remote = self.api.remotes.get(ctx.remote) if ctx.remote else None
-        remotes = [remote] if remote else []
+        if ctx.remote:
+            remote = self.api.remotes.get(ctx.remote)
+            remotes = [remote] if remote else []
 
-        self.create_remote_recipe(refs, ctx, remote)
+            self.create_remote_recipe(refs, ctx, remote)
 
-        graphs = self.build_package_graph(refs, ctx, remotes)
+            graphs = self.build_package_graph(refs, ctx, remotes)
 
-        xx = self.make_build_graph(graphs, ctx, remotes)
+            install_graph = self.make_build_graph(graphs, ctx, remotes)
 
-        ordered_build_graph = self.api.graph.subgraph(xx).topological_sort()
+            execution_levels = install_graph.install_order()
 
+            ordered_build_graph = self.api.graph.subgraph(install_graph).topological_sort()
+        else:
+            raise NotFoundException("No remote configured")
         """      
 
         # 3. Resolve the full dependency graph and identify missing binaries
@@ -203,26 +207,13 @@ class Workflow:
             Create an order graph of the packages to be built.
         """
 
-        install_graphs = [self.make_one(g, context, remotes)for g in graphs]
+        install_graphs = [self.make_one(g, context, remotes) for g in graphs]
 
         if len(install_graphs) > 0:
             merged_build_order = install_graphs[0]
-            for ig in install_graphs[1:]:
-                merged_build_order.merge(ig)
+            for next_graph in install_graphs[1:]:
+                merged_build_order.merge(next_graph)
+            return merged_build_order
         else:
-            merged_build_order = []
-
-
-    def get_matrix_build_order(self, package_list, profile_host_path, profile_build_path=None):
-        # 1. Load profiles for the specific matrix node
-
-        # 4. Analyze binaries against remotes/cache to mark build status
-        self.api.graph.analyze_binaries(deps_graph, build_mode=["missing"])
-
-        # 5. Extract the ordered matrix build steps
-        # This groups packages into sequential lists ("levels") that can be safely built in parallel
-        build_order = self.api.graph.get_build_order(deps_graph)
-        return build_order
-
-
+            return graphs # nothing to build []
 
