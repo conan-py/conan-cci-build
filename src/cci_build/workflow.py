@@ -1,10 +1,15 @@
-import logging
+"""
+    Main workflow for building the packages.
+"""
 from pathlib import Path
 from typing import Tuple, List, Optional, Any
 
+from conan.api.conan_api import ConanAPI
+from conan.api.model import RecipeReference, Remote, ListPattern, PackagesList
+from conan.api.output import ConanOutput
 from conan.internal.errors import NotFoundException
-from conan.internal.graph.graph import Node, RECIPE_VIRTUAL, RECIPE_CONSUMER, DepsGraph
-from conan.internal.graph.install_graph import InstallGraph
+from conan.internal.graph.graph import DepsGraph, BINARY_BUILD
+from conan.internal.model.profile import Profile
 
 from cci_build.conan_centre_index import find_cci_conanfile
 from cci_build.conan_client import ConanClient
@@ -12,25 +17,35 @@ from cci_build.error.exception import PackageFileError
 from cci_build.model.context import Context
 from cci_build.model.settings.types import PackageEntry
 from cci_build.package_parser import load_package_file
-from conan.api.output import ConanOutput
 from cci_build.profile_matcher import include_rules
 
-from conan.api.conan_api import ConanAPI
-from conan.api.model import RecipeReference, Remote, ListPattern
-from conan.internal.model.profile import Profile
 
 def make_revision(ref: RecipeReference) -> str:
+    """
+        Make a conan search revision based on a recipe reference.
+    """
     pattern_str = f"{ref.name}/{ref.version if ref.version else '*'}"
     return pattern_str + (f"@{ref.user}/{ref.channel}" if ref.user and ref.channel else "#*")
 
-def list_select(conan :ConanClient, search_pattern :ListPattern, remote: Optional[Remote]) -> bool:
-    try:
-        return  conan.api.list.select(search_pattern, remote=remote)
 
+def list_select(conan: ConanClient, search_pattern: ListPattern, remote: Optional[Remote]) -> bool:
+    """
+        Select a list of conan recipes.
+    """
+    try:
+        return conan.api.list.select(search_pattern, remote=remote)
     except NotFoundException as e:
-       return False
+        return False
+
 
 class Workflow:
+    """
+        Run a conan workflow to build all missing packages in a jFrog Artifactory repository.
+
+        see:
+           - https://docs.conan.io/2/reference/commands/graph/info.html
+           - https://docs.conan.io/2/reference/extensions/python_api/GraphAPI.html
+    """
     def __init__(self):
         self.profile_build: Optional[Profile] = None
         self.profile_host: Optional[Profile] = None
@@ -69,46 +84,27 @@ class Workflow:
         for pkg in pkgs:
             self.log.info(f"Processing package '{pkg.name}:{pkg.version if pkg.version else "*"}'")
 
-        #
-        # Using the local CCI, map the desired packages to the exact recipe and version to be built
-        # and filter which packages should be included based on the profile filter criteria.
-        #
-        refs = self.filter_package_names(ctx, pkgs)
-
-        # 2. Create a virtual dependency root graph containing all target packages
-        # This mimics a 'conanfile.txt' requiring your entire list
-        #
-        #  see:
-        #    - https://docs.conan.io/2/reference/commands/graph/info.html
-        #    - https://docs.conan.io/2/reference/extensions/python_api/GraphAPI.html
-
         if ctx.remote:
             remote = self.api.remotes.get(ctx.remote)
             remotes = [remote] if remote else []
 
+            #
+            # Using the local CCI, map the desired packages to the exact recipe and version to be built
+            # and filter which packages should be included based on the profile filter criteria.
+            #
+            refs = self.filter_package_names(ctx, pkgs)
+
             self.create_remote_recipe(refs, ctx, remote)
-
-            graphs = self.build_package_graph(refs, ctx, remotes)
-
-            install_graph = self.make_build_graph(graphs, ctx, remotes)
-
-            execution_levels = install_graph.install_order()
-
-            ordered_build_graph = self.api.graph.subgraph(install_graph).topological_sort()
+            graph = self.build_package_graph(refs, ctx, remotes)
+            self.install_and_upload_missing(graph, remote, remotes)
         else:
             raise NotFoundException("No remote configured")
-        """      
 
-        # 3. Resolve the full dependency graph and identify missing binaries
-        # --build=missing is specified to determine what actually needs compiling
-        deps_graph = self.api.graph.load_graph_consumer(
-            root_conanfile,
-            build_mode=["missing"],
-            update=False
-        )
-        """
 
     def filter_package_names(self, ctx: Context, pkgs: list[PackageEntry]) -> List[Tuple[RecipeReference, Path]]:
+        """
+            Given the list of packages to build, filter them based on the host profile.
+        """
         refs = []
         for pkg in pkgs:
 
@@ -130,60 +126,41 @@ class Workflow:
         return refs
 
     def build_package_graph(
-            self, packages: List[Tuple[RecipeReference, Path]], context: Context, remotes: List[Remote]) -> List[DepsGraph]:
+            self, packages: List[Tuple[RecipeReference, Path]], context: Context, remotes: List[Remote]) -> DepsGraph:
         """
             For each of the packages, add it to the package graph.
         """
+        requires = [ref for ref, _ in packages]
+        deps_graph = self.api.graph.load_graph_requires(
+            requires,
+            tool_requires=None,
+            profile_host=self.profile_host, profile_build=self.profile_build,
+            lockfile=None,
+            remotes=remotes,
+            update=True)
+        # Stop now if there was an error
+        deps_graph.report_graph_error()
 
-        graphs = []
-        for ref, conanfile in packages:
-            self.log.info(f"Building graph '{str(ref)}'")
-            clean_conanfile_path = str(Path(conanfile).resolve().absolute())
-            deps_graph = self.conan.api.graph.load_graph_consumer(
-                path=clean_conanfile_path,
-                name=ref.name,
-                version=ref.version,
-                user=ref.user,
-                channel=ref.channel,
-                remotes=remotes,
-                lockfile=None,
-                update=True,  # update the remote if the recipie doesn't exist
-                profile_host=self.profile_host,
-                profile_build=self.profile_build)
+        # mark only remote-missing binaries for build (replaces make_build_graph/make_one)
+        self.api.graph.analyze_binaries(deps_graph, build_mode=["missing"], remotes=remotes, update=True)
 
-            # Stop now if there was an error
-            deps_graph.report_graph_error()
-
-            graphs.append(deps_graph)
-
-        return graphs
-
-    def make_one(self, graph: DepsGraph, context: Context, remotes: List[Remote]) -> InstallGraph:
-
-        class DummyProfileArgs:
-            def __getattr__(self, name):
-                return None
-
-        self.log.info(f"Graph {graph.nodes[0].name}")
-
-        # Go to the remote and check if the binaries are present. It is important
-        # to note that the recipe must exist at the remote.
-        self.conan.api.graph.analyze_binaries(graph, build_mode=["missing"], remotes=remotes)
-
-        # Create an install graph from the dependency graph.
-        return self.conan.api.graph.build_order(graph, profile_args=DummyProfileArgs())
-
+        return deps_graph
 
     def create_remote_recipe(self, refs: List[Tuple[RecipeReference, Path]], context: Context, remote: Remote):
+        """
+            Upload all recipes that don't exist at the remote.
+
+            Note: this creates a recipe in the remote, but none of the binaries.
+        """
         for ref, conanfile_path in refs:
             search_pattern = ListPattern(make_revision(ref))
-            self.log.info(f'Searching for recipe "{ make_revision(ref) }"')
+            self.log.info(f'Searching for recipe "{make_revision(ref)}"')
             remote_check = list_select(self.conan, search_pattern, remote=remote)
             if not remote_check:
 
                 local_recipes = list_select(self.conan, search_pattern, remote=None)
                 if not local_recipes:
-                    self.log.info(f'Exporting recipe "{ str(ref) }"')
+                    self.log.info(f'Exporting recipe "{str(ref)}"')
                     clean_conanfile_path = str(Path(conanfile_path).resolve().absolute())
 
                     exported_ref, conanfile_obj = self.conan.api.export.export(
@@ -193,7 +170,7 @@ class Workflow:
                         user=ref.user,
                         channel=ref.channel)
 
-                self.log.info(f'Upload recipe "{ str(ref) }"')
+                self.log.info(f'Upload recipe "{str(ref)}"')
                 self.conan.api.upload.upload_full(
                     package_list=local_recipes,
                     remote=remote,
@@ -202,18 +179,21 @@ class Workflow:
             else:
                 self.log.info(f'Recipe "{str(ref)}" present at remote "{remote.name}"')
 
-    def make_build_graph(self, graphs: List[DepsGraph], context: Context, remotes: List[Remote]):
+
+    def install_and_upload_missing(self, graph: DepsGraph, remote: Remote, remotes: list[Remote] | list[Any]):
         """
-            Create an order graph of the packages to be built.
+            Locally build those binaries (for the given profile) that are missing at the remote.
         """
+        install_error = self.api.install.install_binaries(deps_graph=graph, remotes=remotes, return_install_error=True)
 
-        install_graphs = [self.make_one(g, context, remotes) for g in graphs]
-
-        if len(install_graphs) > 0:
-            merged_build_order = install_graphs[0]
-            for next_graph in install_graphs[1:]:
-                merged_build_order.merge(next_graph)
-            return merged_build_order
-        else:
-            return graphs # nothing to build []
-
+        built = PackagesList()
+        for node in graph.nodes:
+            # a completed build has a package revision; a failed one does not
+            if node.binary == BINARY_BUILD and node.pref.revision:
+                built.add_ref(node.ref)
+                built.add_pref(node.pref)
+        if built:
+            self.api.upload.upload_full(
+                built, remote, enabled_remotes=remotes, check_integrity=True, dry_run=False)
+        if install_error is not None:
+            raise install_error
