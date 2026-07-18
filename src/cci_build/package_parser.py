@@ -1,3 +1,6 @@
+"""
+    Parse 'package.txt' files which have a list of packages and optionally a version.
+"""
 import re
 from io import TextIOWrapper
 from pathlib import Path
@@ -60,6 +63,9 @@ def parse_line(line: str) -> Optional[PackageEntry]:
 
 
 def parse_profile_rule(rule_str: str) -> ProfileRule:
+    """
+
+    """
     if not rule_str.startswith("!"):
         return ProfileRule(include=True, pattern=rule_str)
     else:
@@ -67,6 +73,9 @@ def parse_profile_rule(rule_str: str) -> ProfileRule:
 
 
 def parse_lines(stream: TextIOWrapper) -> List[PackageEntry]:
+    """
+        Parse a 'package.txt' from a stream.
+    """
     return [
         entry
         for a_line in stream
@@ -75,5 +84,8 @@ def parse_lines(stream: TextIOWrapper) -> List[PackageEntry]:
 
 
 def load_package_file(path: Path) -> List[PackageEntry]:
+    """
+        Parse a 'package.txt' from a filesystem based file.
+    """
     with open(path) as f:
         return parse_lines(f)

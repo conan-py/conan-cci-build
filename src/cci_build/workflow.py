@@ -34,7 +34,8 @@ def list_select(conan: ConanClient, search_pattern: ListPattern, remote: Optiona
     """
     try:
         return conan.api.list.select(search_pattern, remote=remote)
-    except NotFoundException as e:
+    except NotFoundException:
+        # Eat the exception (the specific error is not reported)
         return False
 
 
@@ -46,12 +47,13 @@ class Workflow:
            - https://docs.conan.io/2/reference/commands/graph/info.html
            - https://docs.conan.io/2/reference/extensions/python_api/GraphAPI.html
     """
-    def __init__(self):
+
+    def __init__(self, api: ConanAPI, logger: ConanOutput):
         self.profile_build: Optional[Profile] = None
         self.profile_host: Optional[Profile] = None
-        self.conan = ConanClient()
-        self.api = ConanAPI()
-        self.log = ConanOutput()
+        self.conan = ConanClient(api)
+        self.api = api
+        self.log = logger
 
     def run(self, ctx: Context) -> None:
         """
@@ -78,7 +80,7 @@ class Workflow:
         if self.profile_build is None:
             raise ModuleNotFoundError(f"No profile found for '{ctx.build_profile}'")
 
-        # Load the configuration file describes which packages in the local CCI that need to be built
+        # Load the configuration file which describes packages in the local CCI that need to be built
         pkgs = load_package_file(Path(ctx.packages_filename))
         self.log.info(f"Found {len(pkgs)} packages")
         for pkg in pkgs:

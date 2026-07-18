@@ -1,7 +1,7 @@
 
 [MASTER]
 # This directory contains example python that doesn't need to be linted.
-ignore-paths=^test/micro/resources
+ignore-paths=.*test/micro/resources/.*
 
-[tool.pylint.format]
+[FORMAT]
 max-line-length = 120

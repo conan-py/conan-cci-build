@@ -1,10 +1,10 @@
-from pathlib import Path
-from typing import TypedDict, Optional, Tuple
-
-import os
+"""
+    CCI Utilities
+"""
 import yaml
-from pathlib import Path
 from packaging.version import parse as parse_version
+from pathlib import Path
+from typing import Optional, Tuple
 
 from cci_build.error.exception import RecipeNotFoundError
 from cci_build.model.cci.conandata.types import ConanDataLayout
@@ -12,14 +12,23 @@ from cci_build.model.cci.config.types import Config, VersionInfo
 
 
 def make_cci_recipie_package_config_filename(recipe_dir: Path) -> Path:
+    """
+        Make the path to the 'config.yml' for a package in a CCI
+    """
     return recipe_dir / "config.yml"
 
 
 def make_cci_recipie_package_conanfile_filename(conanfile_folder_name, recipe_dir: Path) -> Path:
+    """
+        Make the path to the 'conanfile.py' for a package in a CCI
+    """
     return recipe_dir / conanfile_folder_name / "conanfile.py"
 
 
 def make_cci_recipie_package_conandata_filename(conanfile_folder_name, recipe_dir: Path) -> Path:
+    """
+        Make the path to the 'conandata.yml' for a package in a CCI
+    """
     return recipe_dir / conanfile_folder_name / "conandata.yml"
 
 

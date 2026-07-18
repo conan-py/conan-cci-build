@@ -1,14 +1,22 @@
-class CacheSyncError(Exception):
+"""
+    Exceptions
+"""
+from conan.errors import ConanException
+
+
+class PackageFileError(ConanException):
+    """
+        A conan error that is raised when a package file is not found.
+    """
     pass
 
 
-class PackageFileError(CacheSyncError):
+class RecipeNotFoundError(ConanException):
+    """
+      A conan error that is raised when a recipe is not found.
+    """
     pass
 
 
-class RecipeNotFoundError(CacheSyncError):
-    pass
-
-
-class ConanAdapterError(CacheSyncError):
+class ConanAdapterError(ConanException):
     pass

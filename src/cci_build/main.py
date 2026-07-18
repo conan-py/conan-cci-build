@@ -1,14 +1,13 @@
 """
     Entrypoint for the cci-build (called from the conan extension command)
 """
-import argparse
 from pathlib import Path
 
-from cci_build.workflow import Workflow
 from conan.api.conan_api import ConanAPI
-from conan.cli.command import conan_command
+from conan.api.output import ConanOutput
 
 from cci_build.model.context import Context
+from cci_build.workflow import Workflow
 
 
 def cci_build_command(_conan_api: ConanAPI, parser, *args):
@@ -36,5 +35,5 @@ def cci_build_command(_conan_api: ConanAPI, parser, *args):
         user=None
     )
 
-    workflow = Workflow()
+    workflow = Workflow(ConanAPI(), ConanOutput())
     workflow.run(config)

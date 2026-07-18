@@ -1,11 +1,12 @@
 from dataclasses import dataclass, field
-from typing import Optional, Tuple, List
-
-
+from typing import Optional, List
 
 
 @dataclass(frozen=True)
 class PackageRef:
+    """
+        A reference to a package to be built.
+    """
     name: str
     """ the name of the package to be built"""
     version: Optional[str] = None
@@ -14,6 +15,7 @@ class PackageRef:
 
 @dataclass(frozen=True)
 class ProfileRule:
+    """ A rule to determine whether a profile should be included in a build """
     include: bool
     pattern: str
 
@@ -24,4 +26,3 @@ class PackageEntry(PackageRef):
 
     profiles: List[ProfileRule] = field(default_factory=list)
     """ The list of profiles that this package should be built for """
-

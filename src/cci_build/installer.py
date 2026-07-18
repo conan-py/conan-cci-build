@@ -38,6 +38,9 @@ def get_conan_home() -> Path:
 
 
 def main():
+    """
+       Entry
+    """
     conan_home = get_conan_home()
     target_dir = conan_home / "extensions" / "commands"
     target_dir.mkdir(parents=True, exist_ok=True)

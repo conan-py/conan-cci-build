@@ -1,11 +1,12 @@
 """
-
+    Wrap the ConanAPI
 """
 from pathlib import Path
 from typing import Iterable
 
 from conan.api.conan_api import ConanAPI
 from conan.api.model import Remote, ListPattern
+from conan.internal.errors import NotFoundException
 
 from cci_build.error.exception import ConanAdapterError
 
@@ -15,11 +16,8 @@ class ConanClient:
         Thin wrapper over Conan 2 public API.
     """
 
-    def __init__(self) -> None:
-        try:
-            self.api = ConanAPI()
-        except Exception as e:
-            raise ConanAdapterError(str(e))
+    def __init__(self, api: ConanAPI) -> None:
+        self.api = api
 
     def binary_exists(self, ref: ListPattern, remote: Remote) -> bool:
         """
@@ -29,7 +27,7 @@ class ConanClient:
         try:
             result = self.api.list.select(ref, remote=remote)
             return bool(result)
-        except Exception:
+        except NotFoundException:
             return False
 
     def create(self, recipe: Path, host: str, build: str) -> list[str]:
