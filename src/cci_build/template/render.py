@@ -3,6 +3,7 @@
 """
 import os
 from io import TextIOWrapper
+from pathlib import Path
 
 from conan.internal.model.profile import Profile
 from jinja2 import Environment
@@ -20,3 +21,11 @@ def render_packages(packages: TextIOWrapper, build_profile: Profile, host_profil
 
     template = jinja2_env.from_string(packages.read())
     return template.render(b=ProfileProxy(build_profile), h=ProfileProxy(host_profile), os=os)
+
+
+def render_packages_file(path: Path , build_profile: Profile, host_profile: Profile) -> str:
+    """
+        Render a package list jinja template from a file
+    """
+    with open(path) as f:
+        return render_packages(f, build_profile, host_profile)

@@ -2,7 +2,7 @@
     Parse 'package.txt' files which have a list of packages and optionally a version.
 """
 import re
-from io import TextIOWrapper
+from io import TextIOWrapper, StringIO
 from pathlib import Path
 from typing import List, Optional
 
@@ -88,3 +88,11 @@ def load_package_file(path: Path) -> List[PackageEntry]:
     """
     with open(path) as f:
         return parse_lines(f)
+
+def load_package_string(content: str) -> List[PackageEntry]:
+    """
+        Parse a 'package.txt' from a string
+    """
+    with StringIO(content) as io:
+        return parse_lines(io)
+

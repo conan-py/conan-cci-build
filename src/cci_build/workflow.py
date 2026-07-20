@@ -1,6 +1,7 @@
 """
     Main workflow for building the packages.
 """
+from io import StringIO
 from pathlib import Path
 from typing import Tuple, List, Optional, Any
 
@@ -16,8 +17,9 @@ from cci_build.conan_client import ConanClient
 from cci_build.error.exception import PackageFileError
 from cci_build.model.context import Context
 from cci_build.model.settings.types import PackageEntry
-from cci_build.package_parser import load_package_file
+from cci_build.package_parser import load_package_file, parse_lines, load_package_string
 from cci_build.profile_matcher import include_rules
+from cci_build.template.render import render_packages_file
 
 
 def make_revision(ref: RecipeReference) -> str:
@@ -81,7 +83,8 @@ class Workflow:
             raise ModuleNotFoundError(f"No profile found for '{ctx.build_profile}'")
 
         # Load the configuration file which describes packages in the local CCI that need to be built
-        pkgs = load_package_file(Path(ctx.packages_filename))
+        t = render_packages_file(Path(ctx.packages_filename), self.profile_build, self.profile_host)
+        pkgs = load_package_string(t)
         self.log.info(f"Found {len(pkgs)} packages")
         for pkg in pkgs:
             self.log.info(f"Processing package '{pkg.name}:{pkg.version if pkg.version else "*"}'")
