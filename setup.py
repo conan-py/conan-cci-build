@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="conan-cci-build",
-    version="0.1.0",
+    use_scm_version=True,
     package_dir={
         "": "src",
         "cci_build_extensions": "extensions",

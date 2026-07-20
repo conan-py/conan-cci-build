@@ -31,6 +31,9 @@ pip >= 26.1.2
 #  - https://pypi.org/project/setuptools/
 setuptools >= 83.0.0
 
+# https://pypi.org/project/setuptools-scm/
+setuptools_scm >= 10.2.0
+
 # https://pypi.org/project/build/
 build >= 1.5.0
 

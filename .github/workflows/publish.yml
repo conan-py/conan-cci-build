@@ -25,6 +25,8 @@ jobs:
       #  https://github.com/actions/checkout
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # setuptools_scm needs tags/history so the version tag can be used
 
       # https://github.com/actions/setup-python
       - name: Set up Python
