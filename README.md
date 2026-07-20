@@ -26,3 +26,4 @@ conan cci-build --remote <name> --cci-root <path to cci recipes> --host-profile 
 - https://pypi.org/project/conan-cci-build/
 - https://github.com/conan-io/conan-center-index
 - https://github.com/conan-io/conan-extensions
+- https://blog.conan.io/2024/04/23/Introducing-local-recipes-index-remote.html

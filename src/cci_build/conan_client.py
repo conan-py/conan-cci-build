@@ -2,13 +2,10 @@
     Wrap the ConanAPI
 """
 from pathlib import Path
-from typing import Iterable
 
 from conan.api.conan_api import ConanAPI
 from conan.api.model import Remote, ListPattern
 from conan.internal.errors import NotFoundException
-
-from cci_build.error.exception import ConanAdapterError
 
 
 class ConanClient:
@@ -35,25 +32,14 @@ class ConanClient:
             Executes in-process create using Conan API.
         """
 
-        try:
-            graph = self.api.graph.load_graph(
-                path=str(recipe),
-                name=None,
-                version=None,
-                args=[f"-pr:h={host}", f"-pr:b={build}", "--build=missing"],
-            )
+        graph = self.api.graph.load_graph(
+            path=str(recipe),
+            name=None,
+            version=None,
+            args=[f"-pr:h={host}", f"-pr:b={build}", "--build=missing"],
+        )
 
-            self.api.graph.analyze_binaries(graph)
-            self.api.graph.build(graph)
+        self.api.graph.analyze_binaries(graph)
+        self.api.graph.build(graph)
 
-            return [str(node.ref) for node in graph.nodes.values() if node.binary_package]
-
-        except Exception as e:
-            raise ConanAdapterError(f"Create failed: {e}")
-
-    def upload(self, refs: Iterable[str], remote: str) -> None:
-        try:
-            for ref in refs:
-                self.api.upload.upload_full(ref, remote=remote, only_recipe=False, only_package=True)
-        except Exception as e:
-            raise ConanAdapterError(f"Upload failed: {e}")
+        return [str(node.ref) for node in graph.nodes.values() if node.binary_package]

@@ -7,6 +7,9 @@ from cci_build.profile_matcher import include_rules
 
 
 class TestProfileMatcher:
+    """
+        Test that the profile matcher works as expected.
+    """
 
     @pytest.mark.parametrize(
         "rules, profile, result",

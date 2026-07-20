@@ -1,4 +1,8 @@
 """
+    POCO models describing data in a CCI 'conandata.yml' file.
+
+    see:
+      - https://github.com/conan-io/conan-center-index/blob/master/docs/adding_packages/folders_and_files.md
 
 """
 from typing import Optional, Dict, List, TypedDict

@@ -1,3 +1,6 @@
+"""
+    Check if a profile matches a package profile.
+"""
 from fnmatch import fnmatch
 from typing import List
 

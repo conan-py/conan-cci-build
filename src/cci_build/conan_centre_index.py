@@ -1,10 +1,11 @@
 """
     CCI Utilities
 """
-import yaml
-from packaging.version import parse as parse_version
 from pathlib import Path
 from typing import Optional, Tuple
+
+import yaml
+from packaging.version import parse as parse_version
 
 from cci_build.error.exception import RecipeNotFoundError
 from cci_build.model.cci.conandata.types import ConanDataLayout
@@ -33,20 +34,30 @@ def make_cci_recipie_package_conandata_filename(conanfile_folder_name, recipe_di
 
 
 def make_cci_recipe_package_path(cci_root: Path, package_name: str) -> Path:
+    """
+
+        Make the path to the conan package in a CCI
+    """
     return Path(cci_root) / "recipes" / package_name
 
 
 def read_package_config_yaml(config_path: Path) -> Config:
+    """
+        Read a 'config.yml' file
+    """
     with open(config_path, "r", encoding="utf-8") as f:
         config_data = yaml.safe_load(f)
     return config_data
 
 
-def read_conandata_yaml(config_path: Path) -> ConanDataLayout:
-    with open(config_path, "r", encoding="utf-8") as f:
-        config_data = yaml.safe_load(f)
-        if config_data.get("sources"):
-            return config_data
+def read_conandata_yaml(conandata_path: Path) -> Optional[ConanDataLayout]:
+    """
+        Read a 'conandata.yml' file
+    """
+    with open(conandata_path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+        if data.get("sources"): # check the YAML has a 'sources' element
+            return data
     return None
 
 
@@ -103,6 +114,7 @@ def find_config_version(
     if version:
         specific_version = versions.get(version)
         return (version, specific_version) if specific_version else (None, None,)
-    else:
-        max_version = max(versions.keys(), key=parse_version)
-        return (max_version, versions.get(max_version),) if max_version else (None, None,)
+
+    # else
+    max_version = max(versions.keys(), key=parse_version)
+    return (max_version, versions.get(max_version),) if max_version else (None, None,)

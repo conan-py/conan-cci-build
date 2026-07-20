@@ -40,7 +40,8 @@ def get_conan_home() -> Path:
 
 def main():
     """
-       Entry
+       Entry point for the conan extension command installer. This entry point is
+       installed by the setup.py script when the module is installed.
     """
     conan_home = get_conan_home()
     target_dir = conan_home / "extensions" / "commands"

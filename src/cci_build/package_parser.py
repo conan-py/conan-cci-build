@@ -40,10 +40,9 @@ LINE_REGEX = re.compile(
 )
 
 
-
-
 def parse_line(line: str) -> Optional[PackageEntry]:
     """
+        Parse a package entry line.
     """
     m = LINE_REGEX.match(line)
     if not m:

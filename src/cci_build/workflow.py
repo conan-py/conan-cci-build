@@ -28,7 +28,7 @@ def make_revision(ref: RecipeReference) -> str:
     return pattern_str + (f"@{ref.user}/{ref.channel}" if ref.user and ref.channel else "#*")
 
 
-def list_select(conan: ConanClient, search_pattern: ListPattern, remote: Optional[Remote]) -> bool:
+def list_select(conan: ConanClient, search_pattern: ListPattern, remote: Optional[Remote]) -> Optional[PackagesList]:
     """
         Select a list of conan recipes.
     """
@@ -36,7 +36,7 @@ def list_select(conan: ConanClient, search_pattern: ListPattern, remote: Optiona
         return conan.api.list.select(search_pattern, remote=remote)
     except NotFoundException:
         # Eat the exception (the specific error is not reported)
-        return False
+        return None
 
 
 class Workflow:
@@ -96,8 +96,8 @@ class Workflow:
             #
             refs = self.filter_package_names(ctx, pkgs)
 
-            self.create_remote_recipe(refs, ctx, remote)
-            graph = self.build_package_graph(refs, ctx, remotes)
+            self.create_remote_recipe(refs, remote)
+            graph = self.build_package_graph(refs, remotes)
             self.install_and_upload_missing(graph, remote, remotes)
         else:
             raise NotFoundException("No remote configured")
@@ -127,8 +127,7 @@ class Workflow:
                 self.log.info("Skipping package '%s' as it does not match the host profile", pkg.name)
         return refs
 
-    def build_package_graph(
-            self, packages: List[Tuple[RecipeReference, Path]], context: Context, remotes: List[Remote]) -> DepsGraph:
+    def build_package_graph(self, packages: List[Tuple[RecipeReference, Path]], remotes: List[Remote]) -> DepsGraph:
         """
             For each of the packages, add it to the package graph.
         """
@@ -148,7 +147,7 @@ class Workflow:
 
         return deps_graph
 
-    def create_remote_recipe(self, refs: List[Tuple[RecipeReference, Path]], context: Context, remote: Remote):
+    def create_remote_recipe(self, refs: List[Tuple[RecipeReference, Path]], remote: Remote):
         """
             Upload all recipes that don't exist at the remote.
 
@@ -157,24 +156,24 @@ class Workflow:
         for ref, conanfile_path in refs:
             search_pattern = ListPattern(make_revision(ref))
             self.log.info(f'Searching for recipe "{make_revision(ref)}"')
-            remote_check = list_select(self.conan, search_pattern, remote=remote)
-            if not remote_check:
+            remote_packages = list_select(self.conan, search_pattern, remote=remote)
+            if not bool(remote_packages):
 
-                local_recipes = list_select(self.conan, search_pattern, remote=None)
-                if not local_recipes:
+                local_packages = list_select(self.conan, search_pattern, remote=None)
+                if not bool(local_packages):
                     self.log.info(f'Exporting recipe "{str(ref)}"')
                     clean_conanfile_path = str(Path(conanfile_path).resolve().absolute())
 
                     exported_ref, conanfile_obj = self.conan.api.export.export(
                         path=clean_conanfile_path,
                         name=ref.name,
-                        version=ref.version,
+                        version=str(ref.version),
                         user=ref.user,
                         channel=ref.channel)
 
                 self.log.info(f'Upload recipe "{str(ref)}"')
                 self.conan.api.upload.upload_full(
-                    package_list=local_recipes,
+                    package_list=local_packages,
                     remote=remote,
                     enabled_remotes=[remote],
                     dry_run=False)
