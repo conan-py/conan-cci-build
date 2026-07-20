@@ -4,7 +4,7 @@ Populate a Conan 2 Artifactory remote from a local Conan Center Index checkout.
 
 # Usage
 
-This module is used along with conan to build packages. The following is an 
+This [module](https://pypi.org/project/conan-cci-build/) is used along with conan to build packages. The following is an 
 example workflow to use this python module.
 
 Notes:
@@ -23,5 +23,6 @@ conan cci-build --remote <name> --cci-root <path to cci recipes> --host-profile 
 
 # Links
 
+- https://pypi.org/project/conan-cci-build/
 - https://github.com/conan-io/conan-center-index
 - https://github.com/conan-io/conan-extensions
