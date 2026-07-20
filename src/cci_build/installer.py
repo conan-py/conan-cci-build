@@ -4,6 +4,7 @@
 import logging
 import os
 import shutil
+from importlib.resources import files, as_file
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -44,10 +45,10 @@ def main():
     conan_home = get_conan_home()
     target_dir = conan_home / "extensions" / "commands"
     target_dir.mkdir(parents=True, exist_ok=True)
+    destination = target_dir / "cmd_cci_build.py"
 
-    src = Path(__file__).parent / "cmd_cci_build.py"
-    dst = target_dir / "cmd_cci_build.py"
+    resource = files("cci_build_extensions.commands").joinpath("cmd_cci_build.py")
+    with as_file(resource) as src:
+        shutil.copyfile(src, destination)
 
-    shutil.copyfile(src, dst)
-
-    log.info(f"Installed Conan extension to: {dst}")
+    log.info(f"Installed Conan extension to: {destination}")
