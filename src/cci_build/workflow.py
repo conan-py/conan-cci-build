@@ -109,28 +109,6 @@ class Workflow:
                 self.log.info("Skipping package '%s' as it does not match the host profile", pkg.name)
         return refs
 
-    def build_package_graph(self, packages: List[Tuple[RecipeReference, Path]], remotes: List[Remote]) -> DepsGraph:
-        """
-            For each of the packages, add it to the package graph.
-        """
-        self.log.info(f"Load graph required for {len(packages)} packages")
-        requires = [ref for ref, _ in packages]
-        deps_graph = self.api.graph.load_graph_requires(
-            requires,
-            tool_requires=None,
-            profile_host=self.profile_host, profile_build=self.profile_build,
-            lockfile=None,
-            remotes=remotes,
-            update=True)
-        # Stop now if there was an error
-        deps_graph.report_graph_error()
-
-        # mark only remote-missing binaries for build (replaces make_build_graph/make_one)
-        self.log.info(f"Analyzing graph dependencies")
-        self.api.graph.analyze_binaries(deps_graph, build_mode=["missing"], remotes=remotes, update=True)
-
-        return deps_graph
-
     def sync_recipies(self, refs: List[Tuple[RecipeReference, Path]], remote: Remote):
         """
             Export all recipies unconditionally into the local conan cache
@@ -158,6 +136,29 @@ class Workflow:
         if to_upload:
             self.log.info(f'Uploading recipes to "{remote.name}"')
             self.conan.api.upload.upload_full(package_list=to_upload, remote=remote, enabled_remotes=[remote])
+
+    def build_package_graph(self, packages: List[Tuple[RecipeReference, Path]], remotes: List[Remote]) -> DepsGraph:
+        """
+            For each of the packages, add it to the package graph.
+        """
+        self.log.info(f"Load graph required for {len(packages)} packages")
+        requires = [ref for ref, _ in packages]
+        deps_graph = self.api.graph.load_graph_requires(
+            requires,
+            tool_requires=None,
+            profile_host=self.profile_host, profile_build=self.profile_build,
+            lockfile=None,
+            remotes=remotes,
+            update=True)
+        # Stop now if there was an error
+        deps_graph.report_graph_error()
+
+        # mark only remote-missing binaries for build (replaces make_build_graph/make_one)
+        self.log.info(f"Analyzing graph dependencies")
+        self.api.graph.analyze_binaries(deps_graph, build_mode=["missing"], remotes=remotes, update=True)
+
+        return deps_graph
+
 
     def install_and_upload_missing(self, graph: DepsGraph, remote: Remote, remotes: list[Remote] | list[Any]):
         """
