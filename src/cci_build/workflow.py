@@ -80,6 +80,7 @@ class Workflow:
             refs = self.filter_package_names(ctx, pkgs)
 
             self.sync_recipies(refs, remote)
+            self.reconcile_local_recipies(refs, remote)
             graph = self.build_package_graph(refs, remotes)
             self.install_and_upload_missing(graph, remote, remotes)
         else:
@@ -109,7 +110,7 @@ class Workflow:
                 self.log.info("Skipping package '%s' as it does not match the host profile", pkg.name)
         return refs
 
-    def sync_recipies(self, refs: List[Tuple[RecipeReference, Path]], remote: Remote):
+    def sync_recipies(self, refs: List[Tuple[RecipeReference, Path]], remote: Remote) -> None:
         """
             Export all recipies unconditionally into the local conan cache
             from the CCI recipes.
@@ -136,6 +137,38 @@ class Workflow:
         if to_upload:
             self.log.info(f'Uploading recipes to "{remote.name}"')
             self.conan.api.upload.upload_full(package_list=to_upload, remote=remote, enabled_remotes=[remote])
+
+    def reconcile_local_recipies(self, refs: List[Tuple[RecipeReference, Path]], remote: Remote) -> None:
+        """
+            Reconcile the local cache with the remote. The local cache should only
+            contain recipe revisions that exist on the remote with the *same*
+            timestamp. Any local revision not present at the remote (including a
+            locally-exported copy whose timestamp diverges from the server's) is
+            deleted, so graph resolution re-fetches the authoritative server copy
+            and the "Reference already exists" timestamp conflict cannot occur.
+        """
+
+        for ref, _ in refs:
+            # Full identity (rrev + timestamp) of every revision on the remote.
+            try:
+                remote_revs = self.conan.api.list.recipe_revisions(ref, remote=remote)
+            except NotFoundException:
+                remote_revs = []
+            remote_ids = {f"{r.repr_notime()}%{r.timestamp}" for r in remote_revs}
+
+            # Every revision currently in the local cache for this reference.
+            try:
+                local_revs = self.conan.api.list.recipe_revisions(ref, remote=None)
+            except NotFoundException:
+                local_revs = []
+
+            for local_rev in local_revs:
+                local_id = f"{local_rev.repr_notime()}%{local_rev.timestamp}"
+                if local_id not in remote_ids:
+                    self.log.info(
+                        f'Removing local recipe "{local_id}" not present at remote "{remote.name}"')
+                    self.conan.api.remove.recipe(local_rev)
+
 
     def build_package_graph(self, packages: List[Tuple[RecipeReference, Path]], remotes: List[Remote]) -> DepsGraph:
         """
