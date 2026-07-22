@@ -99,7 +99,7 @@ class Workflow:
             #
             refs = self.filter_package_names(ctx, pkgs)
 
-            self.create_remote_recipe(refs, remote)
+            self.sync_recipies(refs, remote)
             graph = self.build_package_graph(refs, remotes)
             self.install_and_upload_missing(graph, remote, remotes)
         else:
@@ -134,6 +134,7 @@ class Workflow:
         """
             For each of the packages, add it to the package graph.
         """
+        self.log.info(f"Load graph required for { len(packages) } packages")
         requires = [ref for ref, _ in packages]
         deps_graph = self.api.graph.load_graph_requires(
             requires,
@@ -146,9 +147,39 @@ class Workflow:
         deps_graph.report_graph_error()
 
         # mark only remote-missing binaries for build (replaces make_build_graph/make_one)
+        self.log.info(f"Analyzing graph dependencies")
         self.api.graph.analyze_binaries(deps_graph, build_mode=["missing"], remotes=remotes, update=True)
 
         return deps_graph
+
+    def sync_recipies(self, refs: List[Tuple[RecipeReference, Path]], remote: Remote):
+        """
+            Export all recipies unconditionally into the local conan cache
+            from the CCI recipes.
+        """
+        to_upload = PackagesList()
+        for ref, conanfile_path in refs:
+            clean_conanfile_path = str(Path(conanfile_path).resolve().absolute())
+
+            # 1. Always export from the CCI -> local cache (computes the fresh rrev)
+            self.log.info(f'Exporting recipe "{ref}" from CCI')
+            exported_ref, _ = self.conan.api.export.export(
+                path=clean_conanfile_path,
+                name=ref.name, version=str(ref.version),
+                user=ref.user, channel=ref.channel)
+
+            # 2. Re-select the exact exported revision from the cache
+            pattern = ListPattern(exported_ref.repr_notime())  # name/version@user/channel#rrev
+            pkg_list = self.conan.api.list.select(pattern, remote=None)
+            self.log.info(f'Will upload recipes "{exported_ref.repr_notime()}" to "{remote.name}"')
+            to_upload.merge(pkg_list)
+
+        # 3. Upload all recipes revision to the remote BEFORE any resolution.
+        #    upload_full skips it if the rrev is already upstream.
+        if to_upload:
+            self.log.info(f'Uploading recipes to "{remote.name}"')
+            self.conan.api.upload.upload_full(package_list=to_upload, remote=remote, enabled_remotes=[remote])
+
 
     def create_remote_recipe(self, refs: List[Tuple[RecipeReference, Path]], remote: Remote):
         """
@@ -188,6 +219,7 @@ class Workflow:
         """
             Locally build those binaries (for the given profile) that are missing at the remote.
         """
+        self.log.info(f"Building missing packages")
         install_error = self.api.install.install_binaries(deps_graph=graph, remotes=remotes, return_install_error=True)
 
         built = PackagesList()
@@ -197,7 +229,12 @@ class Workflow:
                 built.add_ref(node.ref)
                 built.add_pref(node.pref)
         if built:
+            self.log.info(f"Upload packages")
             self.api.upload.upload_full(
                 built, remote, enabled_remotes=remotes, check_integrity=True, dry_run=False)
+        else:
+            self.log.info(f"No new packages to build")
+
+
         if install_error is not None:
             raise install_error
