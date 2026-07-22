@@ -1,7 +1,6 @@
 """
     Main workflow for building the packages.
 """
-from io import StringIO
 from pathlib import Path
 from typing import Tuple, List, Optional, Any
 
@@ -17,28 +16,9 @@ from cci_build.conan_client import ConanClient
 from cci_build.error.exception import PackageFileError
 from cci_build.model.context import Context
 from cci_build.model.settings.types import PackageEntry
-from cci_build.package_parser import load_package_file, parse_lines, load_package_string
+from cci_build.package_parser import load_package_string
 from cci_build.profile_matcher import include_rules
 from cci_build.template.render import render_packages_file
-
-
-def make_revision(ref: RecipeReference) -> str:
-    """
-        Make a conan search revision based on a recipe reference.
-    """
-    pattern_str = f"{ref.name}/{ref.version if ref.version else '*'}"
-    return pattern_str + (f"@{ref.user}/{ref.channel}" if ref.user and ref.channel else "#*")
-
-
-def list_select(conan: ConanClient, search_pattern: ListPattern, remote: Optional[Remote]) -> Optional[PackagesList]:
-    """
-        Select a list of conan recipes.
-    """
-    try:
-        return conan.api.list.select(search_pattern, remote=remote)
-    except NotFoundException:
-        # Eat the exception (the specific error is not reported)
-        return None
 
 
 class Workflow:
@@ -105,7 +85,6 @@ class Workflow:
         else:
             raise NotFoundException("No remote configured")
 
-
     def filter_package_names(self, ctx: Context, pkgs: list[PackageEntry]) -> List[Tuple[RecipeReference, Path]]:
         """
             Given the list of packages to build, filter them based on the host profile.
@@ -134,7 +113,7 @@ class Workflow:
         """
             For each of the packages, add it to the package graph.
         """
-        self.log.info(f"Load graph required for { len(packages) } packages")
+        self.log.info(f"Load graph required for {len(packages)} packages")
         requires = [ref for ref, _ in packages]
         deps_graph = self.api.graph.load_graph_requires(
             requires,
@@ -180,41 +159,6 @@ class Workflow:
             self.log.info(f'Uploading recipes to "{remote.name}"')
             self.conan.api.upload.upload_full(package_list=to_upload, remote=remote, enabled_remotes=[remote])
 
-
-    def create_remote_recipe(self, refs: List[Tuple[RecipeReference, Path]], remote: Remote):
-        """
-            Upload all recipes that don't exist at the remote.
-
-            Note: this creates a recipe in the remote, but none of the binaries.
-        """
-        for ref, conanfile_path in refs:
-            search_pattern = ListPattern(make_revision(ref))
-            self.log.info(f'Searching for recipe "{make_revision(ref)}"')
-            remote_packages = list_select(self.conan, search_pattern, remote=remote)
-            if not bool(remote_packages):
-
-                local_packages = list_select(self.conan, search_pattern, remote=None)
-                if not bool(local_packages):
-                    self.log.info(f'Exporting recipe "{str(ref)}"')
-                    clean_conanfile_path = str(Path(conanfile_path).resolve().absolute())
-
-                    exported_ref, conanfile_obj = self.conan.api.export.export(
-                        path=clean_conanfile_path,
-                        name=ref.name,
-                        version=str(ref.version),
-                        user=ref.user,
-                        channel=ref.channel)
-
-                self.log.info(f'Upload recipe "{str(ref)}"')
-                self.conan.api.upload.upload_full(
-                    package_list=local_packages,
-                    remote=remote,
-                    enabled_remotes=[remote],
-                    dry_run=False)
-            else:
-                self.log.info(f'Recipe "{str(ref)}" present at remote "{remote.name}"')
-
-
     def install_and_upload_missing(self, graph: DepsGraph, remote: Remote, remotes: list[Remote] | list[Any]):
         """
             Locally build those binaries (for the given profile) that are missing at the remote.
@@ -234,7 +178,6 @@ class Workflow:
                 built, remote, enabled_remotes=remotes, check_integrity=True, dry_run=False)
         else:
             self.log.info(f"No new packages to build")
-
 
         if install_error is not None:
             raise install_error
