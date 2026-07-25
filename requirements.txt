@@ -2,7 +2,7 @@
 #
 # see:
 #   - https://pypi.org/project/conan/
-conan >= 2.30.0
+conan >= 2.31.1
 
 
 #   - https://pypi.org/project/jinja2/
