@@ -8,6 +8,9 @@ from cci_build.model.settings.types import ProfileRule, PackageEntry
 
 
 def include( pkg: PackageEntry, profile: str) -> bool:
+    """
+        Include rules from a package entry
+    """
     return include_rules(pkg.profiles, profile)
 
 def include_rules(rules : List[ProfileRule], profile: str) -> bool:

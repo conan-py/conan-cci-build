@@ -1,4 +1,3 @@
-import inspect
 from io import StringIO
 from textwrap import dedent
 from typing import Optional, Type

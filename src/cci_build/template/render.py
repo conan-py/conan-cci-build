@@ -27,5 +27,5 @@ def render_packages_file(path: Path , build_profile: Profile, host_profile: Prof
     """
         Render a package list jinja template from a file
     """
-    with open(path) as f:
+    with open(path, encoding="utf-8-sig") as f:
         return render_packages(f, build_profile, host_profile)

@@ -187,7 +187,7 @@ class Workflow:
         deps_graph.report_graph_error()
 
         # mark only remote-missing binaries for build (replaces make_build_graph/make_one)
-        self.log.info(f"Analyzing graph dependencies")
+        self.log.info("Analyzing graph dependencies")
         self.api.graph.analyze_binaries(deps_graph, build_mode=["missing"], remotes=remotes, update=True)
 
         return deps_graph
@@ -197,7 +197,7 @@ class Workflow:
         """
             Locally build those binaries (for the given profile) that are missing at the remote.
         """
-        self.log.info(f"Building missing packages")
+        self.log.info("Building missing packages")
         install_error = self.api.install.install_binaries(deps_graph=graph, remotes=remotes, return_install_error=True)
 
         built = PackagesList()
@@ -207,11 +207,11 @@ class Workflow:
                 built.add_ref(node.ref)
                 built.add_pref(node.pref)
         if built:
-            self.log.info(f"Upload packages")
+            self.log.info("Upload packages")
             self.api.upload.upload_full(
                 built, remote, enabled_remotes=remotes, check_integrity=True, dry_run=False)
         else:
-            self.log.info(f"No new packages to build")
+            self.log.info("No new packages to build")
 
         if install_error is not None:
             raise install_error

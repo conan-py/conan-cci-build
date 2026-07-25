@@ -6,10 +6,9 @@ from io import TextIOWrapper, StringIO
 from pathlib import Path
 from typing import List, Optional
 
-from .error.exception import PackageFileError
+from cci_build.error.exception import PackageFileError
 from cci_build.model.settings.types import PackageEntry, ProfileRule
 
-# LINE = re.compile(r"^\s*([a-zA-Z0-9_.+-]+/[a-zA-Z0-9_.+-]+)(?:\s*\[(.+)\])?\s*$")
 LINE_REGEX = re.compile(
     r"""
     ^
@@ -22,15 +21,15 @@ LINE_REGEX = re.compile(
         # An optional version
         (?: \s* / \s* (?P<version>[\w.+-]+ ) )?
     
+        
+        # This was an early plan that is deprecated. use jinga2 template instead
         \s*
         (?:
             (?: p | profiles ) = 
             (?P<profiles> !? [\w.+*-]+ (?: , \s* !? [\w.+*-]+ )* )
         )?
-
     )?
     \s*    # allow trailing whitespace
-    
     
     (?: \# .* )?  # ignore comments    
     
@@ -63,12 +62,11 @@ def parse_line(line: str) -> Optional[PackageEntry]:
 
 def parse_profile_rule(rule_str: str) -> ProfileRule:
     """
-
+        Factory method to create a positive or negative profile rule
     """
     if not rule_str.startswith("!"):
         return ProfileRule(include=True, pattern=rule_str)
-    else:
-        return ProfileRule(include=False, pattern=rule_str[1:])
+    return ProfileRule(include=False, pattern=rule_str[1:])
 
 
 def parse_lines(stream: TextIOWrapper) -> List[PackageEntry]:
@@ -84,10 +82,12 @@ def parse_lines(stream: TextIOWrapper) -> List[PackageEntry]:
 
 def load_package_file(path: Path) -> List[PackageEntry]:
     """
-        Parse a 'package.txt' from a filesystem based file.
+        Parse a 'package.txt' from a filesystem-based file. Open the file
+        using the BOM (byte order mark) with fallback to UTF-8.
     """
-    with open(path) as f:
+    with open(path, encoding="utf-8-sig") as f:
         return parse_lines(f)
+
 
 def load_package_string(content: str) -> List[PackageEntry]:
     """
@@ -95,4 +95,3 @@ def load_package_string(content: str) -> List[PackageEntry]:
     """
     with StringIO(content) as io:
         return parse_lines(io)
-

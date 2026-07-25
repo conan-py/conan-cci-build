@@ -9,6 +9,7 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
+
 def get_conan_home() -> Path:
     """
         Resolve Conan 2 home directory.
@@ -37,7 +38,6 @@ def get_conan_home() -> Path:
     return Path.home() / ".conan2"
 
 
-
 def main():
     """
        Entry point for the conan extension command installer. This entry point is
@@ -52,4 +52,4 @@ def main():
     with as_file(resource) as src:
         shutil.copyfile(src, destination)
 
-    log.info(f"Installed Conan extension to: {destination}")
+    log.info("Installed Conan extension to '%s'", destination)

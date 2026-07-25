@@ -1,12 +1,15 @@
+"""
+    A adaptor for Conan profiles.
+"""
 from typing import Callable, Any
 
 
 class ProfileNode:
     """
-    Lazy proxy over a Conan profile.
+        Lazy proxy over a Conan profile.
 
-    Every attribute access extends the lookup path.
-    Conversion to str/bool/int/etc performs the actual lookup.
+        Every attribute access extends the lookup path.
+        Conversion to str/bool/int/etc performs the actual lookup.
     """
 
     def __init__(self,

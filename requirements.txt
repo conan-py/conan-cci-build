@@ -24,6 +24,13 @@ pytest >= 9.1.1
 #   - https://pypi.org/project/pylint/
 pylint >= 4.0.6
 
+#  This pylint plugin will enable per-file-ignores in your project
+#
+# see:
+#   - https://pypi.org/project/pylint-per-file-ignores/
+#   - https://github.com/SAP/pylint-per-file-ignores
+pylint-per-file-ignores >= 3.2.1
+
 # pip is the package installer for Python.
 #
 # see:
