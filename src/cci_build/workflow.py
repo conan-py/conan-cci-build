@@ -115,6 +115,7 @@ class Workflow:
             Export all recipies unconditionally into the local conan cache
             from the CCI recipes.
         """
+        active_remotes = self.conan.api.remotes.list()
         to_upload = PackagesList()
         for ref, conanfile_path in refs:
             clean_conanfile_path = str(Path(conanfile_path).resolve().absolute())
@@ -124,7 +125,8 @@ class Workflow:
             exported_ref, _ = self.conan.api.export.export(
                 path=clean_conanfile_path,
                 name=ref.name, version=str(ref.version),
-                user=ref.user, channel=ref.channel)
+                user=ref.user, channel=ref.channel,
+                remotes=[])
 
             # 2. Re-select the exact exported revision from the cache
             pattern = ListPattern(exported_ref.repr_notime())  # name/version@user/channel#rrev
