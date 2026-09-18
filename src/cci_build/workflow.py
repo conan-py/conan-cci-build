@@ -53,6 +53,11 @@ class Workflow:
                - a conan remote configured and authenticated to the Artifactory repository
 
         """
+
+        for config_path in ctx.conan_config or []:
+            self.log.info(f"Install configuration path '{config_path}'")
+            self.api.config.install(config_path, verify_ssl=True)
+
         self.profile_host = self.api.profiles.get_profile([ctx.host_profile])
         if self.profile_host is None:
             raise ModuleNotFoundError(f"No profile found for '{ctx.host_profile}'")

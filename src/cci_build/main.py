@@ -15,6 +15,13 @@ def cci_build_command(_conan_api: ConanAPI, parser, *args):
         Build Conan Center Index packages using a custom utility pipeline.
     """
     # Conan provides its own pre-configured argparse instance via 'parser'
+    parser.add_argument(
+        "--conan-config", "-c",
+        dest="conan_config",
+        action="append",
+        default=[],
+        metavar="path",
+        help="An optional conan configuration to load")
     parser.add_argument("--cci-root", required=True, help="Path to the CCI root directory.")
     parser.add_argument("--remote", required=True, help="Conan remote target.")
     parser.add_argument("--host-profile", required=True, help="Host profile name or path.")

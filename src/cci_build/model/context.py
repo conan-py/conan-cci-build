@@ -3,7 +3,7 @@
 """
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 
 @dataclass(frozen=True)
@@ -11,6 +11,8 @@ class Context:
     """
         A top level state to hold command line arguments and program state.
     """
+    conan_config: List[str]
+    """ An optional list of paths to load a conan configuration from at startup """
 
     cci_root: Path
     """ A filesystem Path to the root of the CCI project """
