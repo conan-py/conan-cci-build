@@ -86,7 +86,7 @@ class Workflow:
 
             self.sync_recipies(refs, remote)
             self.reconcile_local_recipies(refs, remote)
-            graph = self.build_package_graph(refs, remotes)
+            graph = self.build_package_graph(refs, remotes, force_build=ctx.force_build)
             self.install_and_upload_missing(graph, remote, remotes)
         else:
             raise NotFoundException("No remote configured")
@@ -177,7 +177,8 @@ class Workflow:
                     self.conan.api.remove.recipe(local_rev)
 
 
-    def build_package_graph(self, packages: List[Tuple[RecipeReference, Path]], remotes: List[Remote]) -> DepsGraph:
+    def build_package_graph(
+            self, packages: List[Tuple[RecipeReference, Path]], remotes: List[Remote], force_build: bool) -> DepsGraph:
         """
             For each of the packages, add it to the package graph.
         """
@@ -195,10 +196,10 @@ class Workflow:
 
         # mark only remote-missing binaries for build (replaces make_build_graph/make_one)
         self.log.info("Analyzing graph dependencies")
-        self.api.graph.analyze_binaries(deps_graph, build_mode=["missing"], remotes=remotes, update=True)
+        self.api.graph.analyze_binaries(
+            deps_graph, build_mode=["missing" if not force_build else "*"], remotes=remotes, update=True)
 
         return deps_graph
-
 
     def install_and_upload_missing(self, graph: DepsGraph, remote: Remote, remotes: list[Remote] | list[Any]):
         """

@@ -1,6 +1,7 @@
 """
     Entrypoint for the cci-build (called from the conan extension command)
 """
+import argparse
 from pathlib import Path
 
 from conan.api.conan_api import ConanAPI
@@ -27,20 +28,26 @@ def cci_build_command(_conan_api: ConanAPI, parser, *args):
     parser.add_argument("--host-profile", required=True, help="Host profile name or path.")
     parser.add_argument("--build-profile", required=True, help="Build profile name or path.")
     parser.add_argument("file", help="The packages file to process.")
+    parser.add_argument(
+        '--force-build',
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Force building all packages regardless of whether they are in the remote (default: %(default)s)")
 
     # Parse the arguments forwarded from Conan's command line interface
     parsed_args = parser.parse_args(*args)
 
     # Initialize your existing Context object
     config = Context(
+        conan_config=parsed_args.conan_config,
         cci_root=Path(parsed_args.cci_root),
         remote=parsed_args.remote,
         host_profile=parsed_args.host_profile,
         build_profile=parsed_args.build_profile,
         packages_filename=parsed_args.file,
         channel=None,
-        user=None
-    )
+        user=None,
+        force_build=parsed_args.force_build)
 
     workflow = Workflow(ConanAPI(), ConanOutput())
     workflow.run(config)

@@ -29,3 +29,6 @@ class Context:
 
     channel: Optional[str]
     user: Optional[str]
+
+    force_build : bool
+    """ A flag to force building package even if it exists in the upstream remote """
