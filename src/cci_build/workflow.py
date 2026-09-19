@@ -18,6 +18,7 @@ from cci_build.model.context import Context
 from cci_build.model.settings.types import PackageEntry
 from cci_build.package_parser import load_package_string
 from cci_build.profile_matcher import include_rules
+from cci_build.teamcity import teamcity_build_statistic
 from cci_build.template.render import render_packages_file
 
 
@@ -71,6 +72,7 @@ class Workflow:
         t = render_packages_file(Path(ctx.packages_filename), self.profile_build, self.profile_host)
         pkgs = load_package_string(t)
         self.log.info(f"Found {len(pkgs)} packages")
+        teamcity_build_statistic(self.log, "CONAN_PACKAGE_COUNT", str(len(pkgs)))
         for pkg in pkgs:
             self.log.info(f"Processing package '{pkg.name}:{pkg.version if pkg.version else "*"}'")
 
@@ -214,12 +216,21 @@ class Workflow:
             if node.binary == BINARY_BUILD and node.pref.revision:
                 built.add_ref(node.ref)
                 built.add_pref(node.pref)
+
+        # How many packages were built this run
+        built_count = len(built.serialize())
+        teamcity_build_statistic(self.log, "CONAN_BUILT_COUNT", str(built_count))
+
+        # Total dependencies found
+        total_dependencies = len([node for node in graph.nodes if node.ref])
+        teamcity_build_statistic(self.log, "CONAN_PACKAGE_DEPENDENCIES", str(total_dependencies))
+
         if built:
-            self.log.info("Upload packages")
+            self.log.info("Upload {built_count} packages")
             self.api.upload.upload_full(
                 built, remote, enabled_remotes=remotes, check_integrity=True, dry_run=False)
         else:
-            self.log.info("No new packages to build")
+            self.log.info("No new packages to upload")
 
         if install_error is not None:
             raise install_error
