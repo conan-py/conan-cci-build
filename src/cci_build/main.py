@@ -31,7 +31,7 @@ def cci_build_command(_conan_api: ConanAPI, parser, *args):
     parser.add_argument(
         '--force-build',
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=False,
         help="Force building all packages regardless of whether they are in the remote (default: %(default)s)")
 
     # Parse the arguments forwarded from Conan's command line interface
