@@ -44,7 +44,7 @@ def cci_build_command(_conan_api: ConanAPI, parser, *args):
 
     # Parse the arguments forwarded from Conan's command line interface
     parsed_args = parser.parse_args(*args)
-
-    config = Context(**vars(parsed_args))
+    filtered_args = {k: v for k, v in vars(parsed_args).items() if k in Context.__dataclass_fields__.keys()}
+    config = Context(**filtered_args)
     workflow = Workflow(ConanAPI(), ConanOutput())
     workflow.run(config)
