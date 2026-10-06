@@ -35,3 +35,13 @@ class Context:
 
     html_graph : bool
     """ A flag to control whether an html graph is generated """
+
+    # --- Conan Injected CLI Arguments ---
+    out_file: Optional[str] = None
+    """ Injected by Conan for commands supporting output redirection """
+
+    format: Optional[str] = None
+    """ Injected by Conan for commands supporting --format """
+
+    v: Optional[str] = None
+    """ Injected by Conan for verbosity flags (-v) """
