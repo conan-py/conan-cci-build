@@ -27,11 +27,12 @@ class Context:
 
     packages_filename: str
 
-    channel: Optional[str]
-    user: Optional[str]
-
     force_build : bool
     """ A flag to force building package even if it exists in the upstream remote """
 
     html_graph : bool
     """ A flag to control whether an html graph is generated """
+
+    channel: Optional[str] = None
+
+    user: Optional[str] = None
