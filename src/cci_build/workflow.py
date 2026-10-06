@@ -1,12 +1,15 @@
 """
     Main workflow for building the packages.
 """
+from os import path
 from pathlib import Path
 from typing import Tuple, List, Optional, Any
 
 from conan.api.conan_api import ConanAPI
 from conan.api.model import RecipeReference, Remote, ListPattern, PackagesList
 from conan.api.output import ConanOutput
+from conan.cli.formatters.graph.graph import _render_graph
+from conan.cli.formatters.graph.info_graph_html import graph_info_html
 from conan.internal.errors import NotFoundException
 from conan.internal.graph.graph import DepsGraph, BINARY_BUILD
 from conan.internal.model.profile import Profile
@@ -18,7 +21,7 @@ from cci_build.model.context import Context
 from cci_build.model.settings.types import PackageEntry
 from cci_build.package_parser import load_package_string
 from cci_build.profile_matcher import include_rules
-from cci_build.teamcity import teamcity_build_statistic
+from cci_build.teamcity import teamcity_build_statistic, publish_teamcity_artifact
 from cci_build.template.render import render_packages_file
 
 
@@ -89,6 +92,11 @@ class Workflow:
             self.sync_recipies(refs, remote)
             self.reconcile_local_recipies(refs, remote)
             graph = self.build_package_graph(refs, remotes, force_build=ctx.force_build)
+
+            if ctx.html_graph:
+                html_path = self.dependency_graph_html(graph)
+                publish_teamcity_artifact(self.log, "conan-graph.zip", html_path)
+
             self.install_and_upload_missing(graph, remote, remotes)
         else:
             raise NotFoundException("No remote configured")
@@ -202,6 +210,30 @@ class Workflow:
             deps_graph, build_mode=["missing" if not force_build else "*"], remotes=remotes, update=True)
 
         return deps_graph
+
+    def dependency_graph_html(self, deps_graph: DepsGraph) -> str:
+        """
+            Render the dependency graph as HTML, using the same template as
+            `conan graph info --format=html`.
+
+            A file named graph.html in the Conan cache templates folder replaces
+            the built-in page. That is how to point vis-network at a local script
+            instead of the Cloudflare copy.
+
+            see:
+              - https://docs.conan.io/2/reference/commands/graph/info.html
+        """
+        template_folder = path.join(self.api.cache_folder, "templates")
+        user_template = path.join(template_folder, "graph.html")
+        template = graph_info_html
+        if path.isfile(user_template):
+            with open(user_template, "r", encoding="utf-8", newline="") as handle:
+                template = handle.read()
+
+        html_path = path.abspath("conan-graph.html")
+        with open(html_path, "w", encoding="utf-8", newline="") as handle:
+            handle.write(_render_graph(deps_graph, template, template_folder))
+        return html_path
 
     def install_and_upload_missing(self, graph: DepsGraph, remote: Remote, remotes: list[Remote] | list[Any]):
         """

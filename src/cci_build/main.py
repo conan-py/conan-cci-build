@@ -27,27 +27,24 @@ def cci_build_command(_conan_api: ConanAPI, parser, *args):
     parser.add_argument("--remote", required=True, help="Conan remote target.")
     parser.add_argument("--host-profile", required=True, help="Host profile name or path.")
     parser.add_argument("--build-profile", required=True, help="Build profile name or path.")
-    parser.add_argument("file", help="The packages file to process.")
+    parser.add_argument("file", dest="packages_filename", help="The packages file to process.")
     parser.add_argument(
         '--force-build',
         action=argparse.BooleanOptionalAction,
+        dest="force_build",
         default=False,
         help="Force building all packages regardless of whether they are in the remote (default: %(default)s)")
+    parser.add_argument(
+        '--html-graph',
+        action=argparse.BooleanOptionalAction,
+        dest="html_graph",
+        default=True,
+        help="Enable or disable HTML graph generation (default: %(default)s)"
+    )
 
     # Parse the arguments forwarded from Conan's command line interface
     parsed_args = parser.parse_args(*args)
 
-    # Initialize your existing Context object
-    config = Context(
-        conan_config=parsed_args.conan_config,
-        cci_root=Path(parsed_args.cci_root),
-        remote=parsed_args.remote,
-        host_profile=parsed_args.host_profile,
-        build_profile=parsed_args.build_profile,
-        packages_filename=parsed_args.file,
-        channel=None,
-        user=None,
-        force_build=parsed_args.force_build)
-
+    config = Context(**vars(args))
     workflow = Workflow(ConanAPI(), ConanOutput())
     workflow.run(config)
