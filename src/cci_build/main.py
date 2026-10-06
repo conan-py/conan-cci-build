@@ -27,7 +27,7 @@ def cci_build_command(_conan_api: ConanAPI, parser, *args):
     parser.add_argument("--remote", required=True, help="Conan remote target.")
     parser.add_argument("--host-profile", required=True, help="Host profile name or path.")
     parser.add_argument("--build-profile", required=True, help="Build profile name or path.")
-    parser.add_argument("file", dest="packages_filename", help="The packages file to process.")
+    parser.add_argument("packages_filename", metavar="file", help="The packages file to process.")
     parser.add_argument(
         '--force-build',
         action=argparse.BooleanOptionalAction,
@@ -45,6 +45,6 @@ def cci_build_command(_conan_api: ConanAPI, parser, *args):
     # Parse the arguments forwarded from Conan's command line interface
     parsed_args = parser.parse_args(*args)
 
-    config = Context(**vars(args))
+    config = Context(**vars(parsed_args))
     workflow = Workflow(ConanAPI(), ConanOutput())
     workflow.run(config)
