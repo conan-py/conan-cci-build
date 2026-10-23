@@ -204,10 +204,14 @@ class Workflow:
         # Stop now if there was an error
         deps_graph.report_graph_error()
 
-        # mark only remote-missing binaries for build (replaces make_build_graph/make_one)
+        # Mark only remote-missing binaries for build (replaces make_build_graph/make_one).
+        # If running a force build, then mark only the packages from the conanfile for build
+        # (this will exclude build_tools from cross-compilation).
+        build_mode = ["missing"] if not force_build else [f"{ref.name}/{ref.version}" for ref, _ in packages]
+
         self.log.info("Analyzing graph dependencies")
         self.api.graph.analyze_binaries(
-            deps_graph, build_mode=["missing" if not force_build else "*"], remotes=remotes, update=True)
+            deps_graph, build_mode=build_mode, remotes=remotes, update=True)
 
         return deps_graph
 
